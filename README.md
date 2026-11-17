@@ -1,4 +1,4 @@
-(teste de alteração)
+(teste de pull request)
 
 [![CI - Validação do Portfólio](https://github.com/RenanFelliphe/portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/RenanFelliphe/portfolio  /actions/workflows/ci.yml)
 [![CD - Deploy no GitHub Pages](https://github.com/RenanFelliphe/portfolio/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/RenanFelliphe/portfolio/actions/workflows/deploy.yml)
