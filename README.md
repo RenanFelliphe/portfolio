@@ -5,7 +5,7 @@
 
 Site de portfólio publicado automaticamente no GitHub Pages por uma esteira CI/CD no GitHub Actions.
 
-🔗 **Site no ar:** https://SEU-USUARIO.github.io/portfolio/
+🔗 **Site no ar:** https://github.com/RenanFelliphe/portfolio
 
 ## Estrutura
 
