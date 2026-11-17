@@ -1,0 +1,86 @@
+# Etapa 2 + Etapa 4: Entrega Contínua no GitHub Pages, com notificação de falha
+name: CD - Deploy no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Permissões necessárias para publicar no GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publicar site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Verificar se index.html existe na raiz
+        run: test -f index.html || { echo "::error::index.html ausente"; exit 1; }
+
+      - name: Montar pasta de publicação (apenas arquivos do site)
+        run: |
+          mkdir -p _site
+          cp index.html style.css _site/
+          cp -r images _site/
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Enviar artefato do site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  notificar-falha:
+    name: Notificar falha no deploy
+    needs: deploy
+    if: failure()
+    runs-on: ubuntu-latest
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      EMAIL_USUARIO: ${{ secrets.EMAIL_USUARIO }}
+      EMAIL_APP_KEY: ${{ secrets.EMAIL_APP_KEY }}
+      EMAIL_DESTINO: ${{ secrets.EMAIL_DESTINO }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Enviar mensagem no Discord
+        if: env.DISCORD_WEBHOOK != ''
+        run: |
+          curl -sS -H "Content-Type: application/json" -X POST \
+            -d "{\"content\": \"🚨 **Deploy falhou!**\nRepositório: ${{ github.repository }}\nCommit: ${{ github.sha }}\nAutor: ${{ github.actor }}\nDetalhes: ${RUN_URL}\"}" \
+            "$DISCORD_WEBHOOK"
+
+      - name: Enviar e-mail
+        if: env.EMAIL_USUARIO != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USUARIO }}
+          password: ${{ secrets.EMAIL_APP_KEY }}
+          subject: "Deploy falhou - ${{ github.repository }}"
+          to: ${{ secrets.EMAIL_DESTINO }}
+          from: GitHub Actions
+          body: |
+            O deploy do portfólio falhou.
+            Commit: ${{ github.sha }}
+            Autor: ${{ github.actor }}
+            Veja os detalhes: ${{ env.RUN_URL }}

@@ -1,0 +1,111 @@
+# Etapa 1 + Etapa 5: Integração Contínua (roda em todo Pull Request para a main)
+name: CI - Validação do Portfólio
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # 1) Verificações estruturais e de segurança (rodam antes de tudo)
+  estrutura:
+    name: Estrutura e Segurança
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Verificar se index.html existe na raiz
+        run: |
+          if [ ! -f index.html ]; then
+            echo "::error::index.html não encontrado na raiz. O GitHub Pages não vai funcionar."
+            exit 1
+          fi
+          echo "index.html encontrado."
+
+      - name: Bloquear arquivos maiores que 500KB
+        run: |
+          GRANDES=$(find . -type f -size +500k -not -path "./.git/*" -not -path "./node_modules/*")
+          if [ -n "$GRANDES" ]; then
+            echo "::error::Arquivos acima de 500KB encontrados:"
+            echo "$GRANDES"
+            exit 1
+          fi
+          echo "Nenhum arquivo acima de 500KB."
+
+      - name: Varredura de termos proibidos (TODO, FIXME, senha, password)
+        run: |
+          ACHADOS=$(grep -rniE "TODO|FIXME|senha|password" \
+            --include="*.html" --include="*.css" --include="*.js" \
+            --exclude-dir=node_modules --exclude-dir=.git . || true)
+          if [ -n "$ACHADOS" ]; then
+            echo "::error::Termos proibidos encontrados no código:"
+            echo "$ACHADOS"
+            exit 1
+          fi
+          echo "Nenhum termo proibido encontrado."
+
+  # 2) Linter de HTML em duas versões do Node (Matrix Strategy)
+  linter:
+    name: Linter (Node ${{ matrix.node-version }})
+    needs: estrutura
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20]
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar HTMLHint
+        run: npm run lint
+
+  # 3) Verificação de todos os links e imagens (caminhos locais e URLs externas)
+  links:
+    name: Verificação de Links e Imagens
+    needs: estrutura
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar Linkinator
+        run: npm run links
+
+  # 4) Job final: é ESTE que deve ser marcado como obrigatório na proteção da branch
+  ci-aprovado:
+    name: CI Aprovado
+    needs: [estrutura, linter, links]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conferir resultado dos jobs
+        run: |
+          if [ "${{ needs.estrutura.result }}" != "success" ] || \
+             [ "${{ needs.linter.result }}" != "success" ] || \
+             [ "${{ needs.links.result }}" != "success" ]; then
+            echo "::error::Um ou mais jobs falharam. Merge bloqueado."
+            exit 1
+          fi
+          echo "Tudo certo! Código apto para produção."

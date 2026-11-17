@@ -1,0 +1,14 @@
+{
+  "name": "portfolio-renan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portfólio profissional com esteira CI/CD no GitHub Actions",
+  "scripts": {
+    "lint": "htmlhint \"**/*.html\" --ignore \"node_modules/**\"",
+    "links": "linkinator . --skip \"linkedin.com|instagram.com\" --retry"
+  },
+  "devDependencies": {
+    "htmlhint": "^1.1.4",
+    "linkinator": "^6.1.2"
+  }
+}
